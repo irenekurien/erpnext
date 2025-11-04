@@ -43,7 +43,7 @@ states = [
 
 state_numbers = {
 	"Andaman and Nicobar Islands": "35",
-	"Andhra Pradesh": "37",
+	"Andhra Pradesh": "28",
 	"Arunachal Pradesh": "12",
 	"Assam": "18",
 	"Bihar": "10",
