@@ -213,7 +213,6 @@ def create_pledge(loan_application, loan=None):
 			{
 				"loan_security": pledge.loan_security,
 				"qty": pledge.qty,
-				"loan_security_price": pledge.loan_security_price,
 				"haircut": pledge.haircut,
 			},
 		)
