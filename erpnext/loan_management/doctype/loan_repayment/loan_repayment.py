@@ -273,29 +273,32 @@ class LoanRepayment(AccountsController):
 		self.set("repayment_details", [])
 		self.principal_amount_paid = 0
 		self.total_penalty_paid = 0
-		interest_paid = self.amount_paid
+		remaining = self.amount_paid
 
-		if self.shortfall_amount and self.amount_paid > self.shortfall_amount:
+		# 1. Penalty
+		if self.penalty_amount and remaining > self.penalty_amount:
+			self.total_penalty_paid = flt(self.penalty_amount, precision)
+		elif self.penalty_amount:
+			self.total_penalty_paid = flt(remaining, precision)
+
+		remaining -= self.total_penalty_paid
+
+		# 2. Interest
+		remaining, updated_entries = self.allocate_interest_amount(remaining, repayment_details)
+
+		# 3. Shortfall → principal
+		if self.shortfall_amount and remaining > self.shortfall_amount:
 			self.principal_amount_paid = self.shortfall_amount
 		elif self.shortfall_amount:
-			self.principal_amount_paid = self.amount_paid
+			self.principal_amount_paid = remaining
 
-		interest_paid -= self.principal_amount_paid
+		remaining -= self.principal_amount_paid
 
-		if interest_paid > 0:
-			if self.penalty_amount and interest_paid > self.penalty_amount:
-				self.total_penalty_paid = flt(self.penalty_amount, precision)
-			elif self.penalty_amount:
-				self.total_penalty_paid = flt(interest_paid, precision)
-
-			interest_paid -= self.total_penalty_paid
-
+		# 4. Remaining principal
 		if self.is_term_loan:
-			interest_paid, updated_entries = self.allocate_interest_amount(interest_paid, repayment_details)
-			self.allocate_principal_amount_for_term_loans(interest_paid, repayment_details, updated_entries)
+			self.allocate_principal_amount_for_term_loans(remaining, repayment_details, updated_entries)
 		else:
-			interest_paid, updated_entries = self.allocate_interest_amount(interest_paid, repayment_details)
-			self.allocate_excess_payment_for_demand_loans(interest_paid, repayment_details)
+			self.allocate_excess_payment_for_demand_loans(remaining, repayment_details)
 
 	def allocate_interest_amount(self, interest_paid, repayment_details):
 		updated_entries = {}
