@@ -22,6 +22,10 @@ from erpnext.loan_management.doctype.process_loan_interest_accrual.process_loan_
 )
 
 
+SHORTFALL_BEFORE_INTEREST = "shortfall_before_interest"
+INTEREST_BEFORE_SHORTFALL = "interest_before_shortfall"
+
+
 class LoanRepayment(AccountsController):
 	def validate(self):
 		amounts = calculate_amounts(self.against_loan, self.posting_date)
@@ -275,24 +279,41 @@ class LoanRepayment(AccountsController):
 		self.total_penalty_paid = 0
 		remaining = self.amount_paid
 
-		# 1. Penalty
-		if self.penalty_amount and remaining > self.penalty_amount:
-			self.total_penalty_paid = flt(self.penalty_amount, precision)
-		elif self.penalty_amount:
-			self.total_penalty_paid = flt(remaining, precision)
+		if self.get("allocation_order") == SHORTFALL_BEFORE_INTEREST:
+			# 1. Shortfall → principal
+			if self.shortfall_amount and remaining > self.shortfall_amount:
+				self.principal_amount_paid = self.shortfall_amount
+			elif self.shortfall_amount:
+				self.principal_amount_paid = remaining
+			remaining -= self.principal_amount_paid
 
-		remaining -= self.total_penalty_paid
+			# 2. Penalty
+			if remaining > 0:
+				if self.penalty_amount and remaining > self.penalty_amount:
+					self.total_penalty_paid = flt(self.penalty_amount, precision)
+				elif self.penalty_amount:
+					self.total_penalty_paid = flt(remaining, precision)
+				remaining -= self.total_penalty_paid
 
-		# 2. Interest
-		remaining, updated_entries = self.allocate_interest_amount(remaining, repayment_details)
+			# 3. Interest
+			remaining, updated_entries = self.allocate_interest_amount(remaining, repayment_details)
+		else:
+			# 1. Penalty
+			if self.penalty_amount and remaining > self.penalty_amount:
+				self.total_penalty_paid = flt(self.penalty_amount, precision)
+			elif self.penalty_amount:
+				self.total_penalty_paid = flt(remaining, precision)
+			remaining -= self.total_penalty_paid
 
-		# 3. Shortfall → principal
-		if self.shortfall_amount and remaining > self.shortfall_amount:
-			self.principal_amount_paid = self.shortfall_amount
-		elif self.shortfall_amount:
-			self.principal_amount_paid = remaining
+			# 2. Interest
+			remaining, updated_entries = self.allocate_interest_amount(remaining, repayment_details)
 
-		remaining -= self.principal_amount_paid
+			# 3. Shortfall → principal
+			if self.shortfall_amount and remaining > self.shortfall_amount:
+				self.principal_amount_paid = self.shortfall_amount
+			elif self.shortfall_amount:
+				self.principal_amount_paid = remaining
+			remaining -= self.principal_amount_paid
 
 		# 4. Remaining principal
 		if self.is_term_loan:
