@@ -293,6 +293,8 @@ class LoanRepayment(AccountsController):
 			self.allocate_excess_payment_for_demand_loans(remaining_amount, repayment_details)
 
 	def allocate_shortfall(self, remaining_amount):
+		if remaining_amount <= 0:
+			return remaining_amount
 		if self.shortfall_amount and remaining_amount > self.shortfall_amount:
 			self.principal_amount_paid = self.shortfall_amount
 		elif self.shortfall_amount:
@@ -300,6 +302,8 @@ class LoanRepayment(AccountsController):
 		return remaining_amount - self.principal_amount_paid
 
 	def allocate_penalty(self, remaining_amount):
+		if remaining_amount <= 0:
+			return remaining_amount
 		precision = cint(frappe.db.get_default("currency_precision")) or 2
 		if self.penalty_amount and remaining_amount > self.penalty_amount:
 			self.total_penalty_paid = flt(self.penalty_amount, precision)
