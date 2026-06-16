@@ -12,6 +12,8 @@ from erpnext.loan_management.doctype.loan_repayment.loan_repayment import (
     LoanRepayment,
 )
 
+_MODULE = "erpnext.loan_management.doctype.loan_repayment.loan_repayment"
+
 
 class MockDoc:
     """Minimal Frappe Document substitute for testing allocate_amounts."""
@@ -49,6 +51,8 @@ def _allocate(amount_paid, penalty=0, shortfall=0, interest=0, interest_entries=
 
     # Bind LoanRepayment helper methods onto the mock so self.* calls resolve.
     for method in (
+        "allocate_shortfall",
+        "allocate_penalty",
         "allocate_interest_amount",
         "allocate_excess_payment_for_demand_loans",
         "allocate_principal_amount_for_term_loans",
@@ -67,8 +71,7 @@ def _allocate(amount_paid, penalty=0, shortfall=0, interest=0, interest_entries=
 
     details = {"pending_accrual_entries": pending, "unaccrued_interest": 0}
 
-    module = "erpnext.loan_management.doctype.loan_repayment.loan_repayment"
-    with patch(f"{module}.frappe") as mock_frappe:
+    with patch(f"{_MODULE}.frappe") as mock_frappe:
         mock_frappe.db.get_default.return_value = "2"
         LoanRepayment.allocate_amounts(doc, details)
 
