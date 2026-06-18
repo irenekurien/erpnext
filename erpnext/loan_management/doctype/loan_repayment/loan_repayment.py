@@ -294,7 +294,7 @@ class LoanRepayment(AccountsController):
 
 	def allocate_shortfall(self, remaining_amount):
 		if remaining_amount <= 0:
-			return remaining_amount
+			return 0
 		if self.shortfall_amount and remaining_amount > self.shortfall_amount:
 			self.principal_amount_paid = self.shortfall_amount
 		elif self.shortfall_amount:
@@ -303,7 +303,7 @@ class LoanRepayment(AccountsController):
 
 	def allocate_penalty(self, remaining_amount):
 		if remaining_amount <= 0:
-			return remaining_amount
+			return 0
 		precision = cint(frappe.db.get_default("currency_precision")) or 2
 		if self.penalty_amount and remaining_amount > self.penalty_amount:
 			self.total_penalty_paid = flt(self.penalty_amount, precision)
