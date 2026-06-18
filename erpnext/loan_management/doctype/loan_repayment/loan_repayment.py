@@ -22,6 +22,10 @@ from erpnext.loan_management.doctype.process_loan_interest_accrual.process_loan_
 )
 
 
+SHORTFALL_BEFORE_INTEREST = "shortfall_before_interest"
+INTEREST_BEFORE_SHORTFALL = "interest_before_shortfall"
+
+
 class LoanRepayment(AccountsController):
 	def validate(self):
 		amounts = calculate_amounts(self.against_loan, self.posting_date)
@@ -269,33 +273,43 @@ class LoanRepayment(AccountsController):
 			regenerate_repayment_schedule(self.against_loan, cancel)
 
 	def allocate_amounts(self, repayment_details):
-		precision = cint(frappe.db.get_default("currency_precision")) or 2
 		self.set("repayment_details", [])
 		self.principal_amount_paid = 0
 		self.total_penalty_paid = 0
-		interest_paid = self.amount_paid
+		remaining_amount = self.amount_paid
 
-		if self.shortfall_amount and self.amount_paid > self.shortfall_amount:
-			self.principal_amount_paid = self.shortfall_amount
-		elif self.shortfall_amount:
-			self.principal_amount_paid = self.amount_paid
-
-		interest_paid -= self.principal_amount_paid
-
-		if interest_paid > 0:
-			if self.penalty_amount and interest_paid > self.penalty_amount:
-				self.total_penalty_paid = flt(self.penalty_amount, precision)
-			elif self.penalty_amount:
-				self.total_penalty_paid = flt(interest_paid, precision)
-
-			interest_paid -= self.total_penalty_paid
+		if self.get("allocation_order") == SHORTFALL_BEFORE_INTEREST:
+			remaining_amount = self.allocate_shortfall(remaining_amount)
+			remaining_amount = self.allocate_penalty(remaining_amount)
+			remaining_amount, updated_entries = self.allocate_interest_amount(remaining_amount, repayment_details)
+		else:
+			remaining_amount = self.allocate_penalty(remaining_amount)
+			remaining_amount, updated_entries = self.allocate_interest_amount(remaining_amount, repayment_details)
+			remaining_amount = self.allocate_shortfall(remaining_amount)
 
 		if self.is_term_loan:
-			interest_paid, updated_entries = self.allocate_interest_amount(interest_paid, repayment_details)
-			self.allocate_principal_amount_for_term_loans(interest_paid, repayment_details, updated_entries)
+			self.allocate_principal_amount_for_term_loans(remaining_amount, repayment_details, updated_entries)
 		else:
-			interest_paid, updated_entries = self.allocate_interest_amount(interest_paid, repayment_details)
-			self.allocate_excess_payment_for_demand_loans(interest_paid, repayment_details)
+			self.allocate_excess_payment_for_demand_loans(remaining_amount, repayment_details)
+
+	def allocate_shortfall(self, remaining_amount):
+		if remaining_amount <= 0:
+			return 0
+		if self.shortfall_amount and remaining_amount > self.shortfall_amount:
+			self.principal_amount_paid = self.shortfall_amount
+		elif self.shortfall_amount:
+			self.principal_amount_paid = remaining_amount
+		return remaining_amount - self.principal_amount_paid
+
+	def allocate_penalty(self, remaining_amount):
+		if remaining_amount <= 0:
+			return 0
+		precision = cint(frappe.db.get_default("currency_precision")) or 2
+		if self.penalty_amount and remaining_amount > self.penalty_amount:
+			self.total_penalty_paid = flt(self.penalty_amount, precision)
+		elif self.penalty_amount:
+			self.total_penalty_paid = flt(remaining_amount, precision)
+		return remaining_amount - self.total_penalty_paid
 
 	def allocate_interest_amount(self, interest_paid, repayment_details):
 		updated_entries = {}
