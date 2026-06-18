@@ -1,4 +1,4 @@
-name: Build and Push NBFC to ECR
+name: Build and Push ERPNext Base Image to ECR
 on:
   push:
     tags:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    name: Build and Push NBFC Docker
+    name: Build and Push ERPNext Base Docker
     runs-on: ubuntu-latest
     container:
       image: catthehacker/ubuntu:act-22.04
