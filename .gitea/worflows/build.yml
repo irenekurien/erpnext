@@ -1,0 +1,45 @@
+name: Build and Push NBFC to ECR
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: Build and Push NBFC Docker
+    runs-on: ubuntu-latest
+    container:
+      image: catthehacker/ubuntu:act-22.04
+    env:
+      DOCKER_API_VERSION: "1.43"
+    steps:
+      - name: Checkout
+        uses: https://github.com/actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: https://github.com/docker/setup-buildx-action@v3
+      - name: Configure AWS Credentials
+        uses: https://github.com/aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-south-1
+          role-to-assume: arn:aws:iam::507241967663:role/ecr-capital-access
+          role-skip-session-tagging: true
+      - name: Login to AWS ECR
+        id: login-ecr
+        uses: https://github.com/aws-actions/amazon-ecr-login@v2
+      - name: Build Docker Image and Push to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: capital/erpnext
+          IMAGE_TAG: ${{ gitea.ref_name }}
+          GITEA_TOKEN: ${{ gitea.token }}
+        run: |
+          APPS_JSON_BASE64=$(echo "[{\"url\":\"https://x-access-token:${GITEA_TOKEN}@git.int.zerodhacapital.com/zerodha-capital/erpnext.git\",\"branch\":\"cap-13-hotfix\"}]" | base64 -w 0)
+          echo "building $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          docker build --no-cache \
+            --build-arg FRAPPE_PATH=https://github.com/zerodha/frappe \
+            --build-arg FRAPPE_BRANCH=cap-13-hotfix-2 \
+            --build-arg APPS_JSON_BASE64=$APPS_JSON_BASE64 \
+            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+            --file=images/custom/Containerfile \
+            .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
